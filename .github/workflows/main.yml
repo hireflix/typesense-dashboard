@@ -1,0 +1,83 @@
+name: "Build Image"
+
+on:
+  push:
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    env:
+      TAG: latest
+      NODE_ENV: development
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - shell: bash
+      name: "Parse GIT Information"
+      id: tags
+      run: |
+        declare -A TAGS_MAP
+        TAGS_MAP=(["master"]="latest")
+        BRANCH=$(echo ${GITHUB_REF} | sed -r "s/\/?refs\/heads\///g" | sed -r "s/\//\-/g")
+        TAG=${TAGS_MAP[$BRANCH]}
+        REPOSITORY=$(echo "${{ github.repository }}" | sed -r "s/\w*\///" | awk '{print tolower($0)}')
+        REPOSITORY_PREFIX=$(echo "${{ github.repository }}" | awk '{print tolower($0)}')
+        IMAGE=$(echo "${REPOSITORY_PREFIX}/${REPOSITORY}")
+        if [ -d $TAG ]; then
+          TAG=$BRANCH
+        fi
+        commit_message=$(git log --format=%B -n 1 ${{ github.sha }})
+        echo "MESSAGE<<EOF" >> $GITHUB_ENV
+        echo "${commit_message}" >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
+        echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+        echo "IMAGE=${IMAGE}" >> $GITHUB_ENV
+        echo "TAG=${TAG}" >> $GITHUB_ENV
+    - name: "Should Build"
+      if: env.BRANCH == 'master' || startsWith(env.MESSAGE, '[BUILD]') || github.head_ref != ''
+      run: |
+        BUILD=$(echo "1")
+        NODE_ENV=$(echo "production")
+        echo "BUILD=$BUILD" >> $GITHUB_ENV
+        echo "NODE_ENV=$NODE_ENV" >> $GITHUB_ENV
+    - shell: bash
+      name: "Generate new version"
+      if: github.ref == 'refs/heads/master'
+      run: |
+        regex='^bump\((minor|patch|major)\)'
+        git config user.name "Tech CI BOT"
+        git config user.email "tech@hireflix.com"
+        if [[ $MESSAGE =~ $regex ]]; then
+          npm version $(echo ${BASH_REMATCH[1]})
+        else
+          npm version patch
+        fi
+    - shell: bash
+      name: "Get Version name"
+      if: env.BUILD == '1'
+      id: version
+      run: |
+        version=$(git describe --always)
+        echo "VERSION=$version" >> $GITHUB_ENV
+    - uses: docker/build-push-action@v1
+      name: "Build Docker Image"
+      if: env.BUILD == '1'
+      with:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        repository: ${{ env.IMAGE }}
+        registry: docker.pkg.github.com
+        tags: ${{ env.VERSION }}, ${{ env.TAG }}
+        build_args: VERSION=${{ env.VERSION }},NODE_ENV=${{ env.NODE_ENV }},NPM_TOKEN=${{ env.NPM_TOKEN }},SENTRY_AUTH_TOKEN=${{ env.SENTRY_TOKEN }}
+
+    - shell: bash
+      name: "Push New version"
+      if: success() && github.ref == 'refs/heads/master'
+      run: |
+        git push origin --follow-tags
