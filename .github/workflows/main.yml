@@ -3,7 +3,7 @@ name: "Build Image"
 on:
   push:
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   build:
@@ -23,7 +23,7 @@ jobs:
       id: tags
       run: |
         declare -A TAGS_MAP
-        TAGS_MAP=(["master"]="latest")
+        TAGS_MAP=(["main"]="latest")
         BRANCH=$(echo ${GITHUB_REF} | sed -r "s/\/?refs\/heads\///g" | sed -r "s/\//\-/g")
         TAG=${TAGS_MAP[$BRANCH]}
         REPOSITORY=$(echo "${{ github.repository }}" | sed -r "s/\w*\///" | awk '{print tolower($0)}')
@@ -40,7 +40,7 @@ jobs:
         echo "IMAGE=${IMAGE}" >> $GITHUB_ENV
         echo "TAG=${TAG}" >> $GITHUB_ENV
     - name: "Should Build"
-      if: env.BRANCH == 'master' || startsWith(env.MESSAGE, '[BUILD]') || github.head_ref != ''
+      if: env.BRANCH == 'main' || startsWith(env.MESSAGE, '[BUILD]') || github.head_ref != ''
       run: |
         BUILD=$(echo "1")
         NODE_ENV=$(echo "production")
@@ -48,7 +48,7 @@ jobs:
         echo "NODE_ENV=$NODE_ENV" >> $GITHUB_ENV
     - shell: bash
       name: "Generate new version"
-      if: github.ref == 'refs/heads/master'
+      if: github.ref == 'refs/heads/main'
       run: |
         regex='^bump\((minor|patch|major)\)'
         git config user.name "Tech CI BOT"
@@ -78,6 +78,6 @@ jobs:
 
     - shell: bash
       name: "Push New version"
-      if: success() && github.ref == 'refs/heads/master'
+      if: success() && github.ref == 'refs/heads/main'
       run: |
         git push origin --follow-tags
