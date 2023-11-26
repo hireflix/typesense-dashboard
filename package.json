@@ -26,7 +26,7 @@
     "typesense-instantsearch-adapter": "^2.2.0",
     "vue-instantsearch": "https://pkg.csb.dev/algolia/vue-instantsearch/commit/67a2d558/vue-instantsearch",
     "vue-monaco": "^1.2.2",
-    "vue-server-renderer": "^2.6.14",
+    "vue-server-renderer": "^2.7.0",
     "vuex": "^4.0.1"
   },
   "devDependencies": {
