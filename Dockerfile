@@ -11,7 +11,7 @@ ENV PUBLIC_PATH /
 RUN quasar build
 
 
-FROM caddy:2-alpine
+FROM caddy:2.11-alpine
 
 WORKDIR /srv
 COPY --from=builder /app/dist/spa/ ./
